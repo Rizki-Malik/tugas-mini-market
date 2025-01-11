@@ -15,12 +15,25 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                    
+                    @can('view stores')
+                    <x-nav-link :href="route('stores.index')" :active="request()->routeIs('stores.*')">
+                        {{ __('Toko') }}
+                    </x-nav-link>
+                    @endcan
+                    
                     @can('view transactions')
                     <x-nav-link :href="route('transactions.index')" :active="request()->routeIs('transactions.*')">
                         {{ __('Transaksi') }}
                     </x-nav-link>
                     @endcan
 
+                    @can('view products')
+                    <x-nav-link :href="route('products.index')" :active="request()->routeIs('products.*')">
+                        {{ __('Produk') }}
+                    </x-nav-link>
+                    @endcan
+                    
                     @can('view inventory')
                     <x-nav-link :href="route('inventory.index')" :active="request()->routeIs('inventory.*')">
                         {{ __('Stok') }}
@@ -67,6 +80,16 @@
                         </form>
                     </x-slot>
                 </x-dropdown>
+                @if (Route::has('register'))
+                    @can('manage users')
+                        {{-- <a
+                            href="{{ route('register') }}"
+                            class="rounded-md px-3 py-2 text-black ring-1 ring-transparent transition hover:text-black/70 focus:outline-none focus-visible:ring-[#FF2D20] dark:text-white dark:hover:text-white/80 dark:focus-visible:ring-white"
+                        >
+                            Register User
+                        </a> --}}
+                    @endcan
+                @endif
             </div>
 
             <!-- Hamburger -->

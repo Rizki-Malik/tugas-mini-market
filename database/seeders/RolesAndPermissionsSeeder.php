@@ -21,7 +21,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage inventory',
             'view reports',
             'manage users',
-            'print reports'
+            'print reports',
+            'view products',
+            'manage products'
         ];
 
         foreach ($permissions as $permission) {
@@ -38,26 +40,32 @@ class RolesAndPermissionsSeeder extends Seeder
             'view inventory',
             'manage inventory',
             'view reports',
-            'print reports'
+            'print reports',
+            'view products',
+            'manage products'
         ]);
 
         $supervisor = Role::create(['name' => 'supervisor']);
         $supervisor->givePermissionTo([
             'view transactions',
             'view inventory',
-            'view reports'
+            'view reports',
+            'view products'
         ]);
 
         $cashier = Role::create(['name' => 'cashier']);
         $cashier->givePermissionTo([
             'view transactions',
-            'create transactions'
+            'create transactions',
+            'view products'
         ]);
 
         $warehouse = Role::create(['name' => 'warehouse']);
         $warehouse->givePermissionTo([
             'view inventory',
-            'manage inventory'
+            'manage inventory',
+            'view products',
+            'manage products'
         ]);
     }
 }

@@ -38,8 +38,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // Product Management Routes
-    Route::middleware(['permission:manage inventory'])->group(function () {
-        Route::resource('products', ProductController::class);
+    Route::prefix('products')->middleware(['auth', 'verified'])->group(function () {
+        Route::get('/', [ProductController::class, 'index'])
+            ->middleware(['permission:view products'])
+            ->name('products.index');
+    
+        Route::middleware(['permission:manage products'])->group(function () {
+            Route::get('/create', [ProductController::class, 'create'])->name('products.create');
+            Route::post('/', [ProductController::class, 'store'])->name('products.store');
+            Route::get('/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+            Route::put('/{product}', [ProductController::class, 'update'])->name('products.update');
+            Route::delete('/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        });
+    
+        Route::get('/search', [ProductController::class, 'search'])
+            ->middleware(['permission:view products'])
+            ->name('api.products.search');
+    
+        Route::get('/{product}', [ProductController::class, 'show'])
+            ->middleware(['permission:view products'])
+            ->name('products.show');
+        Route::get('/{product}/stores', [ProductController::class, 'showStores'])
+            ->middleware(['permission:view products'])
+            ->name('products.stores');
+    });    
+
+    // Stores Routes
+    Route::prefix('stores')->middleware(['auth', 'verified'])->group(function () {
+        Route::get('/', [StoreController::class, 'index'])
+            ->middleware(['permission:view stores'])
+            ->name('stores.index');
+    
+        Route::middleware(['permission:manage stores'])->group(function () {
+            Route::get('/create', [StoreController::class, 'create'])->name('stores.create');
+            Route::post('/', [StoreController::class, 'store'])->name('stores.store');
+            Route::get('/{store}/edit', [StoreController::class, 'edit'])->name('stores.edit');
+            Route::put('/{store}', [StoreController::class, 'update'])->name('stores.update');
+            Route::delete('/{store}', [StoreController::class, 'destroy'])->name('stores.destroy');
+        });
+
+        Route::get('/{store}/products/add', [StoreController::class, 'addProducts'])->name('stores.products.add');
+
+        Route::post('/{store}/products', [StoreController::class, 'storeProducts'])->name('stores.products.store');
+    
+        Route::get('/{store}/products', [StoreController::class, 'products'])
+            ->middleware(['permission:view stores'])
+            ->name('stores.products');
     });
 
     // Transaction Routes
@@ -69,11 +113,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('inventory')->middleware(['permission:view inventory'])->group(function () {
         Route::get('/', [InventoryController::class, 'index'])->name('inventory.index');
         Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('inventory.low-stock');
+    
         Route::middleware(['permission:manage inventory'])->group(function () {
             Route::get('/{inventory}', [InventoryController::class, 'show'])->name('inventory.show');
             Route::put('/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
+    
+            Route::get('/{inventory}/adjust-stock', [InventoryController::class, 'adjustStockForm'])->name('inventory.adjust-stock.form');
+            Route::put('/{inventory}/adjust-stock', [InventoryController::class, 'adjustStock'])->name('inventory.adjust-stock');
+    
+            Route::get('/{inventory}/transfer-stock', [InventoryController::class, 'transferStockForm'])->name('inventory.transfer-stock.form');
+            Route::post('/transfer', [InventoryController::class, 'transfer'])->name('inventory.transfer');
         });
-    });
+    });    
 
     // Report Routes
     Route::prefix('reports')->middleware(['permission:view reports'])->group(function () {

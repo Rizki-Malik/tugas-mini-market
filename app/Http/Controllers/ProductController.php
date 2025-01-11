@@ -11,6 +11,7 @@ class ProductController extends Controller
     public function index()
     {
         $products = Product::query()
+            ->withSum('inventories as total_stock', 'quantity')
             ->when(request('search'), function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%");
@@ -39,6 +40,16 @@ class ProductController extends Controller
         return redirect()
             ->route('products.index')
             ->with('success', 'Product created successfully.');
+    }
+
+    public function show(Product $product)
+    {
+        $inventoryByStore = $product->inventories()
+            ->with('store')
+            ->get()
+            ->groupBy('store.name');
+            
+        return view('products.show', compact('product', 'inventoryByStore'));
     }
 
     public function edit(Product $product)

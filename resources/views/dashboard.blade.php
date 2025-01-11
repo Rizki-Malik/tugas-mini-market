@@ -38,11 +38,28 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {{-- Chart Penjualan Mingguan --}}
+                {{-- Penjualan Mingguan --}}
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="text-lg font-semibold text-gray-700 mb-4">Penjualan Mingguan</h3>
-                        <canvas id="weeklySalesChart" height="200"></canvas>
+                        @if ($weeklyStats->isNotEmpty())
+                            <ul class="space-y-4">
+                                @foreach ($weeklyStats as $date => $amount)
+                                    <li class="flex justify-between items-center border-b pb-2">
+                                        <div>
+                                            <p class="font-medium text-gray-700">{{ Carbon\Carbon::parse($date)->translatedFormat('l, d F Y') }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-indigo-600 font-bold">
+                                                Rp {{ number_format($amount, 0, ',', '.') }}
+                                            </p>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="text-gray-500 text-center py-4">Belum ada data penjualan mingguan.</p>
+                        @endif
                     </div>
                 </div>
 
@@ -79,41 +96,4 @@
             </div>
         </div>
     </div>
-
-    @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        const ctx = document.getElementById('weeklySalesChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {!! json_encode(array_keys($weeklyStats->toArray())) !!},
-                datasets: [{
-                    label: 'Daily Sales',
-                    data: {!! json_encode(array_values($weeklyStats->toArray())) !!},
-                    borderColor: 'rgb(79, 70, 229)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'Rp ' + new Intl.NumberFormat('id-ID').format(value);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    </script>
-    @endpush
 </x-app-layout>

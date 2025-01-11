@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\Inventory;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
-
+setlocale(LC_TIME, 'id_ID');
+Carbon::setLocale('id');
 class DashboardController extends Controller
 {
     public function index()
@@ -18,24 +16,16 @@ class DashboardController extends Controller
             $storeId = auth()->user()->store_id;
         }
 
-        $today = Carbon::today();
         $todayStats = $this->getTodayStats($storeId);
-        
         $weeklyStats = $this->getWeeklyStats($storeId);
-        
         $lowStockItems = $this->getLowStockItems($storeId);
 
-        return view('dashboard', compact(
-            'todayStats',
-            'weeklyStats',
-            'lowStockItems'
-        ));
+        return view('dashboard', compact('todayStats', 'weeklyStats', 'lowStockItems'));
     }
 
     private function getTodayStats($storeId = null)
     {
         $query = Transaction::whereDate('created_at', Carbon::today());
-        
         if ($storeId) {
             $query->where('store_id', $storeId);
         }
@@ -53,27 +43,18 @@ class DashboardController extends Controller
         $endOfWeek = Carbon::now()->endOfWeek();
 
         $query = Transaction::whereBetween('created_at', [$startOfWeek, $endOfWeek]);
-        
         if ($storeId) {
             $query->where('store_id', $storeId);
         }
 
-        $dailyTotals = $query->get()
-            ->groupBy(function ($transaction) {
-                return $transaction->created_at->format('Y-m-d');
-            })
-            ->map(function ($transactions) {
-                return $transactions->sum('total_amount');
-            });
-
-        return $dailyTotals;
+        return $query->get()
+            ->groupBy(fn($transaction) => $transaction->created_at->format('Y-m-d'))
+            ->map(fn($transactions) => $transactions->sum('total_amount'));
     }
 
     private function getLowStockItems($storeId = null)
     {
-        $query = Inventory::where('quantity', '<=', 10)
-            ->with(['product', 'store']);
-
+        $query = Inventory::where('quantity', '<=', 10)->with(['product', 'store']);
         if ($storeId) {
             $query->where('store_id', $storeId);
         }

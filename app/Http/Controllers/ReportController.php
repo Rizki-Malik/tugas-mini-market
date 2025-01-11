@@ -13,14 +13,20 @@ class ReportController extends Controller
      */
     private function generateSalesSummary($sales)
     {
+        $salesByStore = $sales->groupBy('store_id')->map(function ($storeSales, $storeId) {
+            $storeName = $storeSales->first()->store->name ?? 'Unknown Store';
+            return [
+                'store_name' => $storeName,
+                'total' => $storeSales->sum('total_amount'),
+                'count' => $storeSales->count(),
+            ];
+        });
+
         return [
             'total_sales' => $sales->sum('total_amount'),
             'total_transactions' => $sales->count(),
             'average_transaction' => $sales->average('total_amount'),
-            'sales_by_store' => $sales->groupBy('store_id')->map(fn($storeSales) => [
-                'total' => $storeSales->sum('total_amount'),
-                'count' => $storeSales->count(),
-            ]),
+            'sales_by_store' => $salesByStore,
         ];
     }
 
@@ -86,7 +92,7 @@ class ReportController extends Controller
             $salesQuery->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $sales = $salesQuery->get(); // Fetch the results
+        $sales = $salesQuery->get();
         $transactions = Transaction::query()
             ->when($sales->pluck('store_id')->unique(), fn($query, $storeIds) => $query->whereIn('store_id', $storeIds))
             ->whereBetween('created_at', [$request->date_from, $request->date_to])

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -13,15 +14,15 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         $stores = Store::all();
-        $transactions = Transaction::query();
+        $transactions = Transaction::with(['store', 'items.product']);
 
-        if ($request->has('store_id') && $request->store_id) {
+        if ($request->filled('store_id')) {
             $transactions->where('store_id', $request->store_id);
         }
-        if ($request->has('date_from') && $request->date_from) {
+        if ($request->filled('date_from')) {
             $transactions->whereDate('created_at', '>=', $request->date_from);
         }
-        if ($request->has('date_to') && $request->date_to) {
+        if ($request->filled('date_to')) {
             $transactions->whereDate('created_at', '<=', $request->date_to);
         }
 
@@ -32,10 +33,15 @@ class TransactionController extends Controller
 
     public function create()
     {
-        $stores = Store::all();
-        $products = Product::all();
+        $stores = Store::with(['inventories.product'])->get();
 
-        return view('transactions.create', compact('stores', 'products'));
+        foreach ($stores as $store) {
+            foreach ($store->inventories as $inventory) {
+                $inventory->product->inventory_quantity = $inventory->quantity;
+            }
+        }
+
+        return view('transactions.create', compact('stores'));
     }
 
     public function store(Request $request)
@@ -47,75 +53,81 @@ class TransactionController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
+        foreach ($validated['items'] as $item) {
+            $inventory = Inventory::where('store_id', $validated['store_id'])
+                ->where('product_id', $item['product_id'])
+                ->first();
+
+            if (!$inventory) {
+                return back()->withErrors(['message' => 'Inventory not found for product ID: ' . $item['product_id']]);
+            }
+
+            if ($inventory->quantity < $item['quantity']) {
+                return back()->withErrors(['message' => 'Insufficient stock for product ID: ' . $item['product_id']]);
+            }
+        }
+
         try {
-            return DB::transaction(function () use ($validated, $request) {
-                $total = 0;
-                $items = collect($validated['items'])->map(function ($item) use (&$total) {
-                    $product = Product::findOrFail($item['product_id']);
-                    $subtotal = $product->price * $item['quantity'];
-                    $total += $subtotal;
-
-                    return [
-                        'product_id' => $item['product_id'],
-                        'quantity' => $item['quantity'],
-                        'price' => $product->price,
-                        'subtotal' => $subtotal,
-                    ];
-                });
-
-                // Create transaction
-                $transaction = Transaction::create([
-                    'store_id' => $validated['store_id'],
-                    'user_id' => auth()->id(),
-                    'invoice_number' => 'INV-' . time(),
-                    'total_amount' => $total,
-                ]);
-
-                // Add items and update inventory
-                foreach ($items as $item) {
-                    $transaction->items()->create($item);
-                    
-                    // Update inventory
-                    $inventory = Inventory::where('store_id', $validated['store_id'])
-                        ->where('product_id', $item['product_id'])
-                        ->firstOrFail();
-                    
-                    if ($inventory->quantity < $item['quantity']) {
-                        throw new \Exception('Insufficient stock for product ID: ' . $item['product_id']);
-                    }
-                    
-                    $inventory->decrement('quantity', $item['quantity']);
-                }
-
-                return response()->json([
-                    'status' => 'success',
-                    'transaction' => $transaction->load('items.product'),
-                ]);
+            DB::transaction(function () use ($validated) {
+                $transaction = $this->createTransaction($validated);
+                $this->processTransactionItems($transaction, $validated['items']);
             });
+
+            return redirect()
+                ->route('transactions.index')
+                ->with('success', 'Transaction created successfully.');
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 422);
+            return redirect()
+                ->route('transactions.create')
+                ->withErrors(['message' => 'An error occurred: ' . $e->getMessage()]);
         }
     }
 
     public function show(Transaction $transaction)
     {
-        $transaction->load(['items.product', 'store']);
-
-        return view('transactions.show', [
-            'transaction' => $transaction,
-        ]);
+        $transaction->load(['store', 'items.product']);
+        return view('transactions.show', compact('transaction'));
     }
 
     public function print(Transaction $transaction)
     {
-        $transaction->load(['items.product', 'store']);
+        $transaction->load(['store', 'items.product']);
+        return view('transactions.print', compact('transaction'));
+    }
 
-        return view('transactions.print', [
-            'transaction' => $transaction,
+    private function createTransaction(array $data): Transaction
+    {
+        $totalAmount = collect($data['items'])->reduce(function ($total, $item) {
+            $product = Product::find($item['product_id']);
+            return $total + ($product->price * $item['quantity']);
+        }, 0);
+
+        return Transaction::create([
+            'store_id' => $data['store_id'],
+            'user_id' => auth()->id(),
+            'invoice_number' => 'INV-' . now()->timestamp,
+            'total_amount' => $totalAmount,
         ]);
     }
 
+    private function processTransactionItems(Transaction $transaction, array $items)
+    {
+        foreach ($items as $item) {
+            $product = Product::findOrFail($item['product_id']);
+            $subtotal = $product->price * $item['quantity'];
+
+            $transaction->items()->create([
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'price' => $product->price,
+                'subtotal' => $subtotal,
+            ]);
+
+            $inventory = Inventory::where('store_id', $transaction->store_id)
+                ->where('product_id', $item['product_id'])
+                ->firstOrFail();
+
+            $inventory->decrement('quantity', $item['quantity']);
+        }
+    }
 }
