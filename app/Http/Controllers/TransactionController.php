@@ -7,13 +7,11 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Store;
 use Illuminate\Support\Facades\DB;
-use App\Http\Controllers\Controller;
 
 class TransactionController extends Controller
 {
     public function index(Request $request)
     {
-
         $stores = Store::all();
         $transactions = Transaction::query();
 
@@ -30,6 +28,14 @@ class TransactionController extends Controller
         $transactions = $transactions->paginate(10);
 
         return view('transactions.index', compact('stores', 'transactions'));
+    }
+
+    public function create()
+    {
+        $stores = Store::all();
+        $products = Product::all();
+
+        return view('transactions.create', compact('stores', 'products'));
     }
 
     public function store(Request $request)
@@ -93,4 +99,23 @@ class TransactionController extends Controller
             ], 422);
         }
     }
+
+    public function show(Transaction $transaction)
+    {
+        $transaction->load(['items.product', 'store']);
+
+        return view('transactions.show', [
+            'transaction' => $transaction,
+        ]);
+    }
+
+    public function print(Transaction $transaction)
+    {
+        $transaction->load(['items.product', 'store']);
+
+        return view('transactions.print', [
+            'transaction' => $transaction,
+        ]);
+    }
+
 }
